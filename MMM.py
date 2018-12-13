@@ -1,5 +1,4 @@
 import requests
-from flask import Flask
 from bs4 import BeautifulSoup
 import _json
 
@@ -41,18 +40,4 @@ print (newstuff.text)
 
 roar = requests.get("http://popularity.csail.mit.edu/cgi-bin/image.py?url=https://en.wikipedia.org/wiki/Horse#/media/File:Nokota_Horses_cropped.jpg")
 print (roar.text)
-
-f = open('aotd.html','w')
-
-message = """<html>
-<head></head>
-<body>
-Artwork of the Day
-
-</body>
-</html>"""
-
-f.write(message)
-f.close()
-
 
