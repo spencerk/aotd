@@ -3,18 +3,27 @@
 <h1>On this day in:</h1>
   <ul>
   {% for i in range(0,4) %}
-    <li
-      <p>{{ records[i]['history'] }}
+    <li>
+      <p>
+        {{ records[i]['history'] }}
+      </p>
         {% for j in range(0,3) %}
-          {% if records[i]['searchTerms'][j]['title'] != ""  %}
-          <br /><em>Search Term: {{ records[i]['searchTerms'][j]['term'] }}</em> </p>
+        {% if records[i]['searchTerms'][j]['title'] != ""  %}
+        <p>
+          <em>Search Term: {{ records[i]['searchTerms'][j]['term'] }}</em> 
+        </p>
           <a href="{{ records[i]['searchTerms'][j]['objURL'] }}">
             <img src="{{ records[i]['searchTerms'][j]['img'] }}">
-            <p><b>{{ records[i]['searchTerms'][j]['title'] }}</b><br />{{ records[i]['searchTerms'][j]['artist'] }}</p>
+            <p>
+              <b>{{ records[i]['searchTerms'][j]['title'] }}</b>
+              <br />
+              {{ records[i]['searchTerms'][j]['artist'] }}
+            </p>
           </a>
-        {% endif %}
-       {% endfor %}
-    </li>
-    <hr>
-  {% endfor %}
- 
+          {% endif %}
+         {% endfor %}
+      </li>
+      <hr>
+    {% endfor %}
+  </ul>
+   
