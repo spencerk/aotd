@@ -5,9 +5,6 @@ import _json
 from flask import render_template
 app = Flask(__name__)
 
-
-
-
 @app.route('/fake')
 def aotd():
     term = "English Civil War"
@@ -54,49 +51,41 @@ def aotd():
 
 @app.route('/real')
 def aotd_real():
-
-
     subscription_key = '02beee7ce5844779b21fa4733308236a'
     assert subscription_key
 
     text_analytics_base_url = "https://westus.api.cognitive.microsoft.com/text/analytics/v2.0/"
-
     key_phrase_api_url = text_analytics_base_url + "entities"
     
-    oldpage = requests.get("https://en.wikipedia.org/wiki/Main_Page")
-    soup = BeautifulSoup(oldpage.text, 'html.parser')
+    # Scrape wikipedia
+    wiki_main = requests.get("https://en.wikipedia.org/wiki/Main_Page", verify=False)
+    soup = BeautifulSoup(wiki_main.text, 'html.parser')
+    onThisDay = (soup.find('div',{"id": "mp-otd"}))
+    occurrences = onThisDay.find_all('li')
 
-    soupy= (soup.find('div',{"id": "mp-otd"}))
-
-    soupy1= (soupy.find('ul'))
-
-    lis=soupy1.find_all('li')
-    histories = []
-    for elem in lis:
-        histories.append(elem.text.strip())
-
-    #for i in proper1:
-    documents = {'documents' : [
-        {'id': '1', 'language': 'en', 'text': histories[0]},
-        {'id': '2', 'language': 'en', 'text': histories[1]},
-        {'id': '3', 'language': 'en', 'text': histories[2]},
-        {'id': '4', 'language': 'en', 'text': histories[3]},
-    ]}
+    documents = {'documents' : []}
+    for idx, val in enumerate(occurrences):
+        documents['documents'].append({'id': idx,'language': 'en','text': val.text.strip()})
 
     headers = {"Ocp-Apim-Subscription-Key": subscription_key}
     response = requests.post(key_phrase_api_url, headers=headers, json=documents)
     key_phrases = response.json()
+
+    #print key_phrases
         
-    records = [dict() for x in range(0,4)] 
-    for i in range(0,4):
-        termCount = len(key_phrases['documents'][i]['entities'])
+    records = [dict() for x in range(0,len(occurrences))] 
+    for i in range(0,len(occurrences)):
+        terms = key_phrases['documents'][i]['entities']
+        #print terms
+        termCount = len(terms)
         records[i]['searchTerms'] = [dict() for x in range(0,termCount)]
         for j in range(0,termCount):
-            records[i]['searchTerms'][j]['term'] = (key_phrases['documents'][i]['entities'][j]['name'])
+            if key_phrases['documents'][i]['entities'][j]['name'] is not None:
+                records[i]['searchTerms'][j]['term'] = (key_phrases['documents'][i]['entities'][j]['name'])
 
-    for i in range(0,4):
+    for i in range(0,len(occurrences)):
         for j in range(0,(len(records[i]['searchTerms']))):
-            records[i]['history'] = histories[i]
+            records[i]['history'] = occurrences[i]
             records[i]['reqURL'] = "https://collectionapi.metmuseum.org/public/collection/v1/search?q=%s" % records[i]['searchTerms'][j]['term']
             searchReq = requests.get(records[i]['reqURL'])
             artObjects = searchReq.json()
@@ -111,6 +100,7 @@ def aotd_real():
                     records[i]['searchTerms'][j]['artist'] = firstObjectJSON['artistDisplayName']
                     records[i]['searchTerms'][j]['objURL'] = firstObjectJSON['objectURL']
 
+    print records
 
     return render_template('aotd.html', records=records) 
 
