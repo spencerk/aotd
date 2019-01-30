@@ -3,6 +3,7 @@ from flask import Flask
 from bs4 import BeautifulSoup
 import _json
 from flask import render_template
+import random
 app = Flask(__name__)
 
 @app.route('/today')
@@ -54,7 +55,11 @@ def aotd():
                     records[i]['searchTerms'][j]['artist'] = firstObjectJSON['artistDisplayName']
                     records[i]['searchTerms'][j]['objURL'] = firstObjectJSON['objectURL']
 
+    recCount = len(records)-1
+    randRecord = records[random.randint(0,recCount)]
+    termCount = len(randRecord['searchTerms'])-1
+    randTerm = randRecord['searchTerms'][random.randint(0,termCount)]
 
-    return render_template('aotd.html', records=records) 
+    return render_template('aotd.html', record=randRecord, term=randTerm) 
 
 
