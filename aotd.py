@@ -8,27 +8,33 @@ app = Flask(__name__)
 
 @app.route('/today')
 def aotd():
+    # Connect to Azure
     subscription_key = '02beee7ce5844779b21fa4733308236a'
     assert subscription_key
 
     text_analytics_base_url = "https://westus.api.cognitive.microsoft.com/text/analytics/v2.0/"
     key_phrase_api_url = text_analytics_base_url + "entities"
     
-    # Scrape wikipedia
+    # Scrape wikipedia main page
     wiki_main = requests.get("https://en.wikipedia.org/wiki/Main_Page", verify=False)
     soup = BeautifulSoup(wiki_main.text, 'html.parser')
-    onThisDay = (soup.find('div',{"id": "mp-otd"}))
+    onThisDay = soup.find('div',{"id": "mp-otd"}).find('ul')
     occurrences = onThisDay.find_all('li')
 
+    # Mine scraped occurences for Azure
     documents = {'documents' : []}
     for idx, val in enumerate(occurrences):
         documents['documents'].append({'id': idx,'language': 'en','text': val.text.strip()})
 
+    # Send to Azure to get key phrases
     headers = {"Ocp-Apim-Subscription-Key": subscription_key}
     response = requests.post(key_phrase_api_url, headers=headers, json=documents)
     key_phrases = response.json()
         
+    # Create a place to store records to display    
     records = [dict() for x in range(0,len(occurrences))] 
+
+    # Append search terms and data to records     
     for i in range(0,len(occurrences)):
         terms = key_phrases['documents'][i]['entities']
         #print terms
@@ -37,23 +43,27 @@ def aotd():
         for j in range(0,termCount):
             if key_phrases['documents'][i]['entities'][j]['name'] is not None:
                 records[i]['searchTerms'][j]['term'] = (key_phrases['documents'][i]['entities'][j]['name'])
-
+    # Loop through each term in each event and add data
     for i in range(0,len(occurrences)):
         for j in range(0,(len(records[i]['searchTerms']))):
-            records[i]['history'] = occurrences[i]
-            records[i]['reqURL'] = "https://collectionapi.metmuseum.org/public/collection/v1/search?q=%s" % records[i]['searchTerms'][j]['term']
-            searchReq = requests.get(records[i]['reqURL'])
+            searchTerm = records[i]['searchTerms'][j]['term'] 
+            searchRequestURL =  "https://collectionapi.metmuseum.org/public/collection/v1/search?q=%s" % searchTerm 
+            searchReq = requests.get(searchRequestURL) #search for objects based on search term
             artObjects = searchReq.json()
             if artObjects["objectIDs"] is not None:
                 firstObjectID = artObjects["objectIDs"][0]
                 objReq = "https://collectionapi.metmuseum.org/public/collection/v1/objects/%s" % firstObjectID
                 firstObjectData = requests.get(objReq)
                 firstObjectJSON = firstObjectData.json()
-                if firstObjectJSON['primaryImageSmall'] is not None:
-                    records[i]['searchTerms'][j]['img'] = firstObjectJSON['primaryImageSmall']
-                    records[i]['searchTerms'][j]['title'] = firstObjectJSON['title']
-                    records[i]['searchTerms'][j]['artist'] = firstObjectJSON['artistDisplayName']
-                    records[i]['searchTerms'][j]['objURL'] = firstObjectJSON['objectURL']
+                    
+                if firstObjectJSON['primaryImageSmall'] != "":
+                    #build the record only if the search result returned something that has an image
+                        records[i]['history'] = occurrences[i] #add historical data
+                        records[i]['reqURL'] = searchRequestURL
+                        records[i]['searchTerms'][j]['img'] = firstObjectJSON['primaryImageSmall']
+                        records[i]['searchTerms'][j]['title'] = firstObjectJSON['title']
+                        records[i]['searchTerms'][j]['artist'] = firstObjectJSON['artistDisplayName']
+                        records[i]['searchTerms'][j]['objURL'] = firstObjectJSON['objectURL']
 
     recCount = len(records)-1
     randRecord = records[random.randint(0,recCount)]
