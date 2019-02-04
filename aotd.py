@@ -4,10 +4,13 @@ from bs4 import BeautifulSoup
 import _json
 from flask import render_template
 import random
-app = Flask(__name__)
+import logging
+from werkzeug.contrib.cache import SimpleCache
 
-@app.route('/today')
-def aotd():
+app = Flask(__name__)
+cache = SimpleCache()
+
+def add_records():
     # Connect to Azure
     subscription_key = '02beee7ce5844779b21fa4733308236a'
     assert subscription_key
@@ -21,7 +24,7 @@ def aotd():
     onThisDay = soup.find('div',{"id": "mp-otd"}).find('ul')
     occurrences = onThisDay.find_all('li')
 
-    # Mine scraped occurences for Azure
+    # Mine scraped occurences for this day's events
     documents = {'documents' : []}
     for idx, val in enumerate(occurrences):
         documents['documents'].append({'id': idx,'language': 'en','text': val.text.strip()})
@@ -35,41 +38,63 @@ def aotd():
     records = [dict() for x in range(0,len(occurrences))] 
 
     # Append search terms and data to records     
-    for i in range(0,len(occurrences)):
+    for i in range(0,len(occurrences)): # for each occurrence i in occurrences
         terms = key_phrases['documents'][i]['entities']
         #print terms
         termCount = len(terms)
-        records[i]['searchTerms'] = [dict() for x in range(0,termCount)]
-        for j in range(0,termCount):
+        records[i]['history'] = occurrences[i].text #add historical data
+        records[i]['searchTerms'] = []
+        for j in range(0,termCount): # for each term j in termcount
             if key_phrases['documents'][i]['entities'][j]['name'] is not None:
-                records[i]['searchTerms'][j]['term'] = (key_phrases['documents'][i]['entities'][j]['name'])
-    # Loop through each term in each event and add data
-    for i in range(0,len(occurrences)):
-        for j in range(0,(len(records[i]['searchTerms']))):
-            searchTerm = records[i]['searchTerms'][j]['term'] 
-            searchRequestURL =  "https://collectionapi.metmuseum.org/public/collection/v1/search?q=%s" % searchTerm 
-            searchReq = requests.get(searchRequestURL) #search for objects based on search term
-            artObjects = searchReq.json()
-            if artObjects["objectIDs"] is not None:
-                firstObjectID = artObjects["objectIDs"][0]
-                objReq = "https://collectionapi.metmuseum.org/public/collection/v1/objects/%s" % firstObjectID
-                firstObjectData = requests.get(objReq)
-                firstObjectJSON = firstObjectData.json()
-                    
-                if firstObjectJSON['primaryImageSmall'] != "":
-                    #build the record only if the search result returned something that has an image
-                        records[i]['history'] = occurrences[i] #add historical data
-                        records[i]['reqURL'] = searchRequestURL
-                        records[i]['searchTerms'][j]['img'] = firstObjectJSON['primaryImageSmall']
-                        records[i]['searchTerms'][j]['title'] = firstObjectJSON['title']
-                        records[i]['searchTerms'][j]['artist'] = firstObjectJSON['artistDisplayName']
-                        records[i]['searchTerms'][j]['objURL'] = firstObjectJSON['objectURL']
+                # Loop through each term in each event and add data
+                searchTerm = (key_phrases['documents'][i]['entities'][j]['name'])
+                searchRequestURL =  "https://collectionapi.metmuseum.org/public/collection/v1/search?q=%s" % searchTerm 
+                searchReq = requests.get(searchRequestURL) #search for objects based on search term
+                artObjects = searchReq.json()
+                if artObjects["objectIDs"] is not None:
+                    firstObjectID = artObjects["objectIDs"][0]
+                    objReq = "https://collectionapi.metmuseum.org/public/collection/v1/objects/%s" % firstObjectID
+                    firstObjectData = requests.get(objReq)
+                    firstObjectJSON = firstObjectData.json()
+                        
+                    if firstObjectJSON['primaryImageSmall'] != "" :
+                        #build the record only if the search result returned something that has an image
+                            info = {
+                                    "term":     searchTerm,
+                                    "reqURL":   searchRequestURL,
+                                    "img":      firstObjectJSON['primaryImageSmall'],
+                                    "title":    firstObjectJSON['title'],
+                                    "artist":   firstObjectJSON['artistDisplayName']
+                                    }
+                            records[i]['searchTerms'].append(info)
 
-    recCount = len(records)-1
-    randRecord = records[random.randint(0,recCount)]
-    termCount = len(randRecord['searchTerms'])-1
-    randTerm = randRecord['searchTerms'][random.randint(0,termCount)]
+    for r in range(0,len(records)-1):
+        if len(records[r]['searchTerms']) == 0:
+            records.remove(r)
 
-    return render_template('aotd.html', record=randRecord, term=randTerm) 
+    return records
+
+def get_rand_record(rec):
+    recCount = len(rec)-1
+    randRecord = rec[random.randint(0,recCount-1)]
+    return randRecord
+
+def get_records():
+    rv = cache.get('my_records')
+    if rv is None:
+        rv = add_records()
+        cache.set('my_records', rv, timeout=5 * 60)
+    return rv
+
+@app.route('/today')
+def aotd():
+
+    rec = get_records()
+    randRecord = get_rand_record(rec)
+    terms = randRecord['searchTerms']   
+    randTerm = terms[random.randint(0,len(terms)-1)]
+
+    hist = randRecord['history']
+    return render_template('aotd.html', history=hist, term=randTerm) 
 
 

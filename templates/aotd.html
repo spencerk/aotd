@@ -5,20 +5,16 @@
 </head>
 <h1>On this day in:</h1>
       <p>
-        {{ record['history'].text }}
+        {{ history }}
       </p>
-        <p>
+      <p>
         <em>Search Term: {{ term['term'] }}</em> 
+      </p>
+      <a href="{{ term['objURL'] }}">
+        <img src="{{ term['img'] }}">
+        <p>
+          <b>{{ term['title'] }}</b>
+          <br />
+          {{ term['artist'] }}
         </p>
-          <a href="{{ term['objURL'] }}">
-            <img src="{{ term['img'] }}">
-            <p>
-              <b>{{ term['title'] }}</b>
-              <br />
-              {{ term['artist'] }}
-            </p>
-          </a>
-      </li>
-      <hr>
-  </ul>
-   
+      </a>
