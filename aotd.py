@@ -83,7 +83,7 @@ def get_records():
     rv = cache.get('my_records')
     if rv is None:
         rv = add_records()
-        cache.set('my_records', rv, timeout=5 * 60)
+        cache.set('my_records', rv, timeout=180 * 60)
     return rv
 
 @app.route('/today')
