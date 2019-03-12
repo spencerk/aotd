@@ -12,7 +12,7 @@ cache = SimpleCache()
 
 def add_records():
     # Connect to Azure
-    subscription_key = '02beee7ce5844779b21fa4733308236a'
+    subscription_key = {enter_subscription_key_here}
     assert subscription_key
 
     text_analytics_base_url = "https://westus.api.cognitive.microsoft.com/text/analytics/v2.0/"
